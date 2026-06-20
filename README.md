@@ -1,5 +1,5 @@
 
-# IndustryGPT-Specialised-LLM-Bot-Using-Pre-Trained-Models (LoRA / QLoRA)
+# Specialized LLM Bot Using Pre-Trained Models : E-commerce customer service bot
 
 ## 📌 Project Overview
 
