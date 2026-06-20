@@ -31,11 +31,11 @@ The final model is deployed with a **Gradio chat interface**, allowing real-time
 
 # 🏭 Selected Industry
 
-**Retail Customer Support**
+**E-Commerce Customer Support**
 
 This domain was selected because:
 
-* Retail companies widely use AI chatbots in real environments
+* E-Commerce companies widely use AI chatbots in real environments
 * The domain has structured Q&A data available
 * It allows training a focused and practical chatbot model
 
@@ -43,7 +43,7 @@ This domain was selected because:
 
 # 📂 Dataset
 
-The chatbot is trained using a **public instruction-response dataset** containing real customer support conversations.
+We utilize the **Bitext Retail Dataset**, which contains over 44,000 professional customer-agent interactions. We clean and format this data into a specific 'Instruction/Response' template that teaches the model how to behave in a support environment.
 
 The dataset includes:
 
