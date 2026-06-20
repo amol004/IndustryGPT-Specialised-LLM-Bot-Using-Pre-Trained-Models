@@ -231,13 +231,3 @@ I'm happy to help! I can certainly assist you with that. To begin, please provid
 
 ---
 
-# 🚀 Future Improvements
-
-* Add multi-turn conversation memory
-* Expand dataset for better generalization
-* Deploy model as API
-* Integrate with real e-commerce backend
-
----
-
-⭐ If you like this project, consider giving it a star!
