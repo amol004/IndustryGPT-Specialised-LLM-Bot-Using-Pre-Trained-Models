@@ -45,10 +45,17 @@ This domain was selected because:
 
 We utilize the **Bitext Retail Dataset**, which contains over 44,000 professional customer-agent interactions. We clean and format this data into a specific 'Instruction/Response' template that teaches the model how to behave in a support environment.
 
-The dataset includes:
+# **Fields of the Dataset**
 
-* Customer queries (instructions)
-* Agent responses (expected output)
+To ensure high-quality training, each entry in the dataset is structured with specific metadata. Here is a breakdown of what each field represents:
+
+| Field | Description |
+| :--- | :--- |
+| **🏷️ tags** | Technical metadata used for internal dataset tracking. |
+| **📝 instruction** | The actual user request or question from the Retail (eCommerce) domain. |
+| **📁 category** | The high-level semantic group for the request (e.g., DELIVERY, RETURNS). |
+| **🎯 intent** | The specific goal of the user instruction (e.g., track_delivery, request_refund). |
+| **✅ response** | The ideal, professional response the assistant is expected to provide. |
 
 Example training format:
 
