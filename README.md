@@ -1,65 +1,134 @@
+# IndustryGPT | E-commerce Customer Support Assistant
 
-# Specialized LLM Bot Using Pre-Trained Models : E-commerce customer service bot
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/amol004/IndustryGPT-Specialised-LLM-Bot-Using-Pre-Trained-Models/blob/main/IndustryGPT_Specialized_LLM_Bot_Using_Pre_Trained_Models.ipynb)
 
-## 📌 Project Overview
+IndustryGPT is an e-commerce customer support chatbot built by fine-tuning **TinyLlama 1.1B Chat** on retail conversations. The project uses 4-bit quantization and LoRA adapters to adapt a pre-trained language model within a limited GPU memory budget, then exposes it through a Gradio chat interface.
 
-This project focuses on building a **production-ready domain-specific chatbot** by fine-tuning a Large Language Model (LLM) using a publicly available dataset.
+The notebook covers the complete experiment: loading and formatting customer support data, configuring the model, supervised fine-tuning, plotting training loss, saving the adapter and tokenizer, and running an interactive demo.
 
-Instead of using Retrieval Augmented Generation (RAG), this project follows a **model-training approach**, where a pretrained Hugging Face model is **fine-tuned on customer support conversations** to directly learn the domain knowledge.
+| At a glance | Experiment |
+| --- | --- |
+| Domain | Retail and e-commerce customer support |
+| Base model | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` |
+| Dataset | Bitext retail and e-commerce chatbot training dataset |
+| Dataset size | 44,884 examples in the loaded training split |
+| Training subset | First 3,000 examples after formatting and tokenization |
+| Fine-tuning | LoRA adapters on a 4-bit quantized base model |
+| Interface | Gradio `ChatInterface` |
+| Recorded hardware | NVIDIA Tesla T4 in Google Colab |
 
-The chatbot is designed to answer questions related to:
+## The problem
 
-* Orders
-* Shipping
-* Returns & Refunds
-* Product queries
-* General customer support
+Customer support teams handle repeated questions about orders, delivery, carts, returns, refunds, invoices, and account management. This project explores how a general language model can be adapted to answer retail support questions in a consistent, helpful style using examples from a domain-specific dataset.
 
-The final model is deployed with a **Gradio chat interface**, allowing real-time interaction.
+The assistant generates responses from its trained model. It does not connect to a live store database or retrieve current company policies, so it cannot verify an actual order, tracking number, or refund status.
 
----
+## Understanding fine-tuning, LoRA, and QLoRA
 
-# 🎯 Objectives
+### What is fine-tuning?
 
-* Build an industry-ready chatbot using LLM fine-tuning
-* Train the model using a **public LLM dataset**
-* Apply **QLoRA / LoRA** to train efficiently on limited hardware
-* Reduce hallucination and improve factual responses
-* Deploy a simple UI using **Gradio**
+A pre-trained language model has already learned patterns from a large amount of text. **Fine-tuning** continues its training using examples for a particular task, so its responses can better match that task.
 
----
+In this project, the starting model is TinyLlama 1.1B Chat. The training examples pair retail questions with customer support responses. During training, the model predicts tokens and adjusts its trainable parameters using the prediction error, called **loss**.
 
-# 🏭 Selected Industry
-
-**E-Commerce Customer Support**
-
-This domain was selected because:
-
-* E-Commerce companies widely use AI chatbots in real environments
-* The domain has structured Q&A data available
-* It allows training a focused and practical chatbot model
-
----
-
-# 📂 Dataset
-
-We utilize the **Bitext Retail Dataset**, which contains over 44,000 professional customer-agent interactions. We clean and format this data into a specific 'Instruction/Response' template that teaches the model how to behave in a support environment.
-
-# **Fields of the Dataset**
-
-To ensure high-quality training, each entry in the dataset is structured with specific metadata. Here is a breakdown of what each field represents:
-
-| Field | Description |
-| :--- | :--- |
-| **🏷️ tags** | Technical metadata used for internal dataset tracking. |
-| **📝 instruction** | The actual user request or question from the Retail (eCommerce) domain. |
-| **📁 category** | The high-level semantic group for the request (e.g., DELIVERY, RETURNS). |
-| **🎯 intent** | The specific goal of the user instruction (e.g., track_delivery, request_refund). |
-| **✅ response** | The ideal, professional response the assistant is expected to provide. |
-
-Example training format:
-
+```mermaid
+flowchart TD
+    B["Pre-trained TinyLlama"] --> T["Fine-tuning on retail examples"]
+    D["Customer questions and responses"] --> T
+    T --> A["Retail-adapted assistant"]
 ```
+
+For example, the model sees requests such as “I want to return a damaged item” alongside examples of helpful support responses. Fine-tuning teaches it patterns in those examples; it does not give the model access to a retailer's current orders or policies.
+
+### What is LoRA?
+
+**LoRA** (Low-Rank Adaptation) is a method for fine-tuning a model by adding small trainable layers called **adapters** to selected parts of the model. The original model weights stay frozen while the adapters learn the task-specific changes.
+
+```mermaid
+flowchart TD
+    M["Pre-trained model"] --> F["Frozen base weights"]
+    M --> A["LoRA adapters"]
+    D["Retail training examples"] --> T["Training"]
+    A --> T
+    T --> U["Updated adapter weights"]
+    F --> R["Adapted model for inference"]
+    U --> R
+```
+
+This reduces the number of parameters that need to be trained and stored. IndustryGPT targets the `q_proj` and `v_proj` attention layers. The notebook reports **2,252,800 trainable parameters**, or **0.2044%** of the model's reported total.
+
+### What is QLoRA?
+
+**QLoRA** combines LoRA adapters with a quantized base model. **Quantization** stores model weights using fewer bits, reducing memory use. In this notebook, the base model is loaded in 4-bit NF4 format; LoRA adapters are then trained while the quantized base remains frozen.
+
+```mermaid
+flowchart TD
+    B["Pre-trained TinyLlama"] --> Q["Load base weights in 4-bit NF4"]
+    Q --> L["Attach LoRA adapters"]
+    D["Retail training data"] --> T["Train adapter parameters"]
+    L --> T
+    T --> S["Save adapter and tokenizer"]
+```
+
+| Approach | Base model | Parameters trained | Memory considerations |
+| --- | --- | --- | --- |
+| Full fine-tuning | Typically loaded at higher precision | All or most model weights | Requires optimizer state and gradients for the trained weights |
+| LoRA | Base weights remain frozen | Small adapter layers | Reduces the number of trainable parameters |
+| QLoRA | Frozen base weights are quantized | Small adapter layers | Reduces base model memory use as well as trainable parameters |
+
+IndustryGPT uses the QLoRA approach: **4-bit quantization for the base model and LoRA for task-specific training**. The notebook was run with a Tesla T4 GPU. Memory use and model quality depend on the model, settings, and hardware.
+
+## Project workflow
+
+```mermaid
+flowchart TD
+    A["Bitext retail dataset"] --> B["Format instruction and response"]
+    B --> C["Tokenize to 512 tokens"]
+    C --> D["Select 3,000 training examples"]
+    M["TinyLlama 1.1B Chat"] --> Q["4-bit NF4 quantization"]
+    Q --> L["Attach LoRA adapters"]
+    D --> T["Supervised fine-tuning"]
+    L --> T
+    T --> S["Save adapter and tokenizer"]
+    S --> G["Gradio chat demo"]
+```
+
+## Customer support scenarios
+
+| Area | Example question |
+| --- | --- |
+| Delivery | “How do I track my delivery?” |
+| Returns | “I want to return a damaged item.” |
+| Shipping | “Can I change my shipping address after ordering?” |
+| Account | “How do I close my account?” |
+| Shipping options | “Do you offer express shipping?” |
+| Billing | “I didn't receive my invoice.” |
+
+These are example prompts from the notebook's Gradio interface. Responses are generated text and require verification against a real retailer's systems and policies.
+
+## Dataset and preparation
+
+The project loads [Bitext's retail and e-commerce chatbot training dataset](https://huggingface.co/datasets/bitext/Bitext-retail-ecommerce-llm-chatbot-training-dataset) using Hugging Face Datasets. Each source record contains an `instruction`, `response`, `category`, `intent`, and `tags` field.
+
+| Field | Role in the source data |
+| --- | --- |
+| `instruction` | Customer request or question |
+| `response` | Reference customer support response |
+| `category` | Broad support topic |
+| `intent` | Specific customer intent |
+| `tags` | Additional dataset metadata |
+
+Only `instruction` and `response` are combined into the training text. The other fields are removed from the model input. The notebook maps and tokenizes all 44,884 rows, then selects the **first 3,000** for training; the selection is not shuffled in the shown code.
+
+```mermaid
+pie title Training subset from the loaded dataset
+    "Selected for training - 3,000" : 3000
+    "Remaining examples - 41,884" : 41884
+```
+
+Each example follows an instruction-response template:
+
+```text
 ### Instruction:
 Where is my order?
 
@@ -67,174 +136,133 @@ Where is my order?
 You can track your order using the tracking link sent to your email.
 ```
 
-This format helps the model learn conversational behaviour.
+The tokenizer truncates and pads examples to **512 tokens**. The notebook copies `input_ids` into `labels` for causal language modeling. In this implementation, the labels include prompt and padding tokens; response-only and padding masking are not applied.
 
----
+## Model adaptation
 
-# 🤖 Model Selection
+### Quantization and LoRA
 
-A pretrained **Hugging Face causal language model** was used as the base model.
+The base model is loaded with BitsAndBytes 4-bit quantization. PEFT adds LoRA adapters to the attention query and value projection layers. Training updates a small set of adapter parameters while the base model weights remain frozen.
 
-### Why use a pretrained model?
-
-Training an LLM from scratch requires:
-
-* Massive datasets
-* High-end GPUs
-* Long training time
-
-Using a pretrained model provides:
-
-* Strong language understanding
-* Faster training
-* Lower compute cost
-
-The selected model supports:
-
-* 4-bit quantization
-* LoRA / QLoRA fine-tuning
-* Efficient inference in Google Colab
-
----
-
-# ⚙️ Project Pipeline
-
-## 1️⃣ Environment Setup
-
-Libraries used:
-
-* transformers
-* datasets
-* peft
-* bitsandbytes
-* accelerate
-* trl
-* gradio
-
----
-
-## 2️⃣ Data Preprocessing
-
-The dataset is cleaned and formatted into instruction-response prompts.
-
-Steps performed:
-
-* Remove unnecessary columns
-* Convert data into prompt template
-* Tokenize the text for training
-
----
-
-## 3️⃣ Quantization (Memory Optimization)
-
-Large models consume significant memory.
-
-To solve this, **4-bit quantization** is applied using BitsAndBytes.
-
-Benefits:
-
-* Reduces GPU memory usage
-* Enables training on Google Colab
-* Maintains model performance
-
----
-
-## 4️⃣ LoRA / QLoRA Fine-Tuning
-
-Instead of updating all model parameters, we use **Parameter Efficient Fine-Tuning (PEFT)**.
-
-### LoRA Benefits
-
-* Trains only small adapter layers
-* Faster training
-* Requires less memory
-* Keeps base model intact
-
-This allows us to fine-tune large models even on limited hardware.
-
----
-
-## 5️⃣ Model Training
-
-The Hugging Face Trainer API is used.
-
-Training configuration includes:
-
-* Learning rate tuning
-* Gradient accumulation
-* Multiple training epochs
-* Batch size optimization
-
-The model learns to map **user instructions → correct responses**.
-
----
-
-## 6️⃣ Hallucination Reduction Techniques
-
-LLMs sometimes generate incorrect information.
-To reduce hallucination, we used:
-
-* Domain-specific dataset
-* Controlled generation parameters
-* Low temperature sampling
-* Repetition penalty
-* Limited max token generation
-
-These techniques guide the model to produce **relevant and factual answers**.
-
----
-
-## 7️⃣ Model Saving
-
-After training, the following are saved:
-
-* Fine-tuned model weights
-* Tokenizer
-* Configuration files
-
-This allows the model to be reused without retraining.
-
----
-
-## 8️⃣ Chat Interface using Gradio
-
-A Gradio UI is built to simulate a real chatbot.
-
-Users can:
-
-* Enter questions
-* Receive real-time responses
-* Interact in conversational format
-
----
-
-# 💬 Example Prompt
-
-User:
-
-```
-I want to return a damaged item.
+```mermaid
+flowchart LR
+    I["Tokenized text"] --> B["4-bit TinyLlama base"]
+    I --> L["Trainable LoRA adapters"]
+    B --> O["Causal language model output"]
+    L --> O
 ```
 
-Bot:
+| Configuration | Notebook value |
+| --- | --- |
+| Quantization | 4-bit NormalFloat (`nf4`) |
+| Compute dtype | `float16` |
+| Double quantization | Enabled |
+| LoRA rank | `16` |
+| LoRA alpha | `32` |
+| LoRA dropout | `0.1` |
+| Target modules | `q_proj`, `v_proj` |
+| Trainable parameters | 2,252,800 of 1,102,301,184 total (**0.2044%**) |
 
+The parameter counts are taken from the notebook's `print_trainable_parameters()` output; they are not an accuracy measurement.
+
+### Training configuration
+
+| Setting | Value |
+| --- | --- |
+| Training examples | 3,000 |
+| Epochs | 2 |
+| Batch size per device | 4 |
+| Gradient accumulation steps | 4 |
+| Effective batch size on one device | 16 examples per optimizer step |
+| Learning rate | `2e-4` |
+| Optimizer | `paged_adamw_8bit` |
+| Mixed precision | FP16 enabled |
+| Checkpoint strategy | At each epoch |
+| Logging interval | Every 50 steps |
+
+Training is configured with Hugging Face `TrainingArguments` and run with `Trainer`. The notebook saves the PEFT adapter and tokenizer to `ecommerce-chatbot/`; this is not a standalone copy of the full base model.
+
+## Chat and inference
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as Gradio interface
+    participant Model as TinyLlama and LoRA
+    User->>UI: Submit a support question
+    UI->>Model: Send system instruction and current message
+    Model-->>UI: Generate response tokens
+    UI-->>User: Display decoded response
 ```
-I'm happy to help! I can certainly assist you with that. To begin, please provide me with the details of your issue, such as the product name or description, the location where it was purchased, and any relevant information about the damage. Once we have this data, I will be able to quickly identify the problem and guide you through the process of returning the item. Please don't hesitate to reach out if there's anything else I can assist you with.
-```
 
----
+The interface uses a retail support system instruction and a template for the current message. Although Gradio provides a `history` argument, the notebook's response function does not add previous turns to the prompt. Each model response therefore depends on the current message rather than the chat history.
 
+| Generation setting | Value | Purpose |
+| --- | --- | --- |
+| `max_new_tokens` | 250 | Limits the length of the generated response |
+| `temperature` | 0.4 | Controls sampling randomness |
+| `top_p` | 0.9 | Limits sampling to a probability-based token set |
+| `repetition_penalty` | 1.2 | Discourages repeated text |
+| `do_sample` | `True` | Enables sampling |
 
+These settings shape generation; they do not fact-check an answer or guarantee factual accuracy.
 
-# 📊 Key Technologies
+## Training observations and evaluation
 
-| Tool                     | Purpose                  |
-| ------------------------ | ------------------------ |
-| HuggingFace Transformers | Model & Tokenizer        |
-| PEFT                     | LoRA / QLoRA Fine-tuning |
-| BitsAndBytes             | 4-bit Quantization       |
-| PyTorch                  | Deep Learning Framework  |
-| Gradio                   | Chatbot UI               |
+The notebook plots **training loss** from `trainer.state.log_history` across training steps. The figure is titled “Chat Bot Accuracy Over Time” in the notebook, but the plotted values are loss, not accuracy. The repository does not report a held-out evaluation set, benchmark score, or before-and-after comparison, so the plot alone cannot establish accuracy or generalization.
 
----
+For a more complete evaluation, compare the base model and adapter on held-out retail questions and review response relevance, factuality, policy compliance, and behavior when order information is unavailable. Consider masking padding and instruction tokens in the training loss and reviewing how the first 3,000 selected rows represent the dataset's categories before drawing conclusions.
 
+## Technology stack
+
+| Technology | Use in this project |
+| --- | --- |
+| Python | Notebook implementation and data preparation |
+| PyTorch | Tensors, model execution, and inference |
+| Hugging Face Transformers | TinyLlama model, tokenizer, quantization configuration, `Trainer`, and generation |
+| Hugging Face Datasets | Dataset loading, mapping, and selection |
+| PEFT | LoRA configuration and adapter training |
+| BitsAndBytes | 4-bit model loading and 8-bit optimizer support |
+| Accelerate | Device placement support |
+| pandas | Previewing dataset and tokenized records |
+| Matplotlib and seaborn | Notebook visualization imports; Matplotlib plots training loss |
+| Gradio | Interactive chat interface |
+| Google Colab | Notebook runtime and optional GPU environment |
+
+`trl` is installed in the notebook; the training code uses Transformers `Trainer`.
+
+## Run the notebook
+
+1. Open the [notebook in Google Colab](https://colab.research.google.com/github/amol004/IndustryGPT-Specialised-LLM-Bot-Using-Pre-Trained-Models/blob/main/IndustryGPT_Specialized_LLM_Bot_Using_Pre_Trained_Models.ipynb).
+2. Select a GPU runtime. The recorded experiment used a Tesla T4; availability and runtime limits depend on Colab.
+3. Install the notebook dependencies. Include Gradio if it is not already available in the runtime:
+
+   ```python
+   !pip install -q transformers datasets peft bitsandbytes accelerate trl gradio pandas matplotlib seaborn
+   ```
+
+4. The notebook reads a Hugging Face token from a Colab secret named `HF_TOKEN`. Add that secret if using the login cell, and do not put the token in the notebook or repository.
+5. Run the cells in order to load and format the dataset, configure the model, train the adapter, and launch the Gradio interface.
+
+The demo uses `share=True`; the public URL printed by Gradio is temporary. The repository does not include a permanent deployment URL, trained adapter files, or a pinned dependency manifest.
+
+## Repository contents
+
+| File | Description |
+| --- | --- |
+| `IndustryGPT_Specialized_LLM_Bot_Using_Pre_Trained_Models.ipynb` | Data preparation, model configuration, training, loss plot, saving, and Gradio demo |
+| `README.md` | Project overview and usage guide |
+| `.gitignore` | Files and directories excluded from version control |
+
+## Limitations and next steps
+
+- Connect to an authorized order or policy source before answering questions that require live customer data.
+- Add a held-out test split and compare the adapted model with the base model using repeatable evaluation prompts.
+- Mask padding and, if training on responses only is intended, instruction tokens in the loss labels.
+- Examine category and intent coverage when choosing the training subset.
+- Pass conversation history to the model if multi-turn context is required.
+- Pin and test dependency versions, save the adapter as a reusable artifact, and document a reproducible deployment path.
+
+## Author
+
+**Amol Thakur** · [GitHub](https://github.com/amol004)
