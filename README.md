@@ -207,11 +207,7 @@ The interface uses a retail support system instruction and a template for the cu
 
 These settings shape generation; they do not fact-check an answer or guarantee factual accuracy.
 
-## Training observations and evaluation
 
-The notebook plots **training loss** from `trainer.state.log_history` across training steps. The figure is titled “Chat Bot Accuracy Over Time” in the notebook, but the plotted values are loss, not accuracy. The repository does not report a held-out evaluation set, benchmark score, or before-and-after comparison, so the plot alone cannot establish accuracy or generalization.
-
-For a more complete evaluation, compare the base model and adapter on held-out retail questions and review response relevance, factuality, policy compliance, and behavior when order information is unavailable. Consider masking padding and instruction tokens in the training loss and reviewing how the first 3,000 selected rows represent the dataset's categories before drawing conclusions.
 
 ## Technology stack
 
